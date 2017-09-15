@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"bufio"
 )
 
 func main() {
@@ -39,5 +41,20 @@ func main() {
 
 	if len(os.Args) == 3 && os.Args[1] == "help" && os.Args[2] == "post" {
 		fmt.Println(helpPostStr)
+	}
+
+	if len(os.Args) == 3 && os.Args[1] == "get" {
+		conn, err := net.Dial("tcp", os.Args[2])
+		if err != nil {
+			fmt.Printf("error: %v\n",err)
+			return
+		}
+		fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+		status, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			fmt.Printf("error: %v\n",err)
+			return
+		}
+		fmt.Printf("status: %v\n",status)
 	}
 }
