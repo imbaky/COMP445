@@ -49,7 +49,7 @@ func main() {
 			fmt.Printf("error: %v\n",err)
 			return
 		}
-		fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+		fmt.Fprintf(conn, "GET / HTTP/1.0\r\nHost: "+os.Args[2]+"\r\n\r\n")
 		status, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
 			fmt.Printf("error: %v\n",err)
