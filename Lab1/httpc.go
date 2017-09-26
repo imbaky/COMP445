@@ -1,7 +1,9 @@
 package main
 
 import (
-	"bufio"
+	"net/url"
+	// "bufio"
+	"io/ioutil"
 	"fmt"
 	"net"
 	"os"
@@ -44,36 +46,31 @@ func main() {
 	}
 
 	if len(os.Args) == 3 && os.Args[1] == "get" {
+		u, err := url.Parse("http://"+os.Args[2])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not parse url: %v", err)
+		}
 		//resolve address
-		addr, err := net.ResolveTCPAddr("tcp", os.Args[2]+":80")
+		addr, err := net.ResolveTCPAddr("tcp", u.Host+":80")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not resolve address: %v", err)
 		}
 
 		//open a connection
 		conn, err := net.DialTCP("tcp", nil, addr)
-		conn.Close()
+		defer conn.Close()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not open connection: %v", err)
 		}
 
 		//write to connection
-		fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+		fmt.Fprintf(conn, "GET / HTTP/1.0\r\nHost: www.%s\r\n\r\n",u.Host)
 
-		html, err := bufio.NewReader(conn).ReadString('\n')
+		//read from connection
+		result, err := ioutil.ReadAll(conn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading from connection :%v", err)
 		}
-
-		fmt.Printf("%v", html)
-
-		// service := os.Args[2]
-		// u, err := url.Parse(service)
-		// fmt.Println(u.Host)
-		// tcpAddr, err := net.ResolveTCPAddr("tcp4", u.Host)
-		// conn, err := net.DialTCP("tcp", nil, tcpAddr)
-		// _, err = conn.Write([]byte("HEAD / HTTP/1.0\r\nHost :" + u.Host + "\r\n\r\n"))
-		// result, err := ioutil.ReadAll(conn)
-		// fmt.Println(string(result))
+		fmt.Printf("%s", result)
 	}
 }
