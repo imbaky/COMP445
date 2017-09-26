@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
-	"bufio"
+	"io/ioutil"
 )
 
 func main() {
@@ -44,17 +45,24 @@ func main() {
 	}
 
 	if len(os.Args) == 3 && os.Args[1] == "get" {
-		conn, err := net.Dial("tcp", os.Args[2])
-		if err != nil {
-			fmt.Printf("error: %v\n",err)
-			return
-		}
-		fmt.Fprintf(conn, "GET / HTTP/1.0\r\nHost: "+os.Args[2]+"\r\n\r\n")
-		status, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			fmt.Printf("error: %v\n",err)
-			return
-		}
-		fmt.Printf("status: %v\n",status)
+		service := os.Args[2]
+		u, err := url.Parse(service)
+		fmt.Println(u.Host)
+		tcpAddr, err := net.ResolveTCPAddr("tcp4", u.Host)
+		checkError(err)
+		conn, err := net.DialTCP("tcp", nil, tcpAddr)
+		checkError(err)
+		_, err = conn.Write([]byte("HEAD / HTTP/1.0\r\nHost :"+u.Host+"\r\n\r\n"))
+		checkError(err)
+		result, err := ioutil.ReadAll(conn)
+		checkError(err)
+		fmt.Println(string(result))
+	}
+}
+
+func checkError(err error) {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error: %s", err.Error())
+        os.Exit(1)
 	}
 }
