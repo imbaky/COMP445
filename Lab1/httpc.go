@@ -64,7 +64,7 @@ func main() {
 		}
 
 		//write to connection
-		fmt.Fprintf(conn, "GET / HTTP/1.0\r\nHost: www.%s\r\n\r\n",u.Host)
+		fmt.Fprintf(conn, "GET /%s HTTP/1.0\r\nHost: www.%s\r\n\r\n",u.Path,u.Host)
 
 		//read from connection
 		result, err := ioutil.ReadAll(conn)
