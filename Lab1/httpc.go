@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -48,11 +47,10 @@ func main() {
 	flag.Parse()
 
 	kvmap := make(map[string]string)
-	if h != "" {
-		for _, v := range strings.Split(h, ",") {
-			fmt.Printf("v %v\n", v)
+	content := os.Args[findArgPos(os.Args, "-h")+1]
+	if content != "" {
+		for _, v := range strings.Split(content, ",") {
 			pair := strings.Split(v, ":")
-			fmt.Printf("pair %v\n", pair)
 			kvmap[pair[0]] = pair[1]
 		}
 	}
@@ -78,11 +76,13 @@ func main() {
 		u, err := url.Parse("http://" + os.Args[len(os.Args)-1])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not parse url: %v", err)
+			return
 		}
 		//resolve address
 		addr, err := net.ResolveTCPAddr("tcp", u.Host+":80")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not resolve address: %v", err)
+			return
 		}
 
 		//open a connection
@@ -90,12 +90,14 @@ func main() {
 		defer conn.Close()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not open connection: %v", err)
+			return
 		}
 
 		get.Write(conn, u, kvmap)
 		status, result, err := get.Read(conn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading from connection :%v", err)
+			return
 		}
 		if findArg(os.Args, "-o") {
 			o = os.Args[findArgPos(os.Args, "-o")+1]
@@ -121,11 +123,13 @@ func main() {
 		u, err := url.Parse("http://" + os.Args[len(os.Args)-1])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not parse url: %v", err)
+			return
 		}
 		//resolve address
 		addr, err := net.ResolveTCPAddr("tcp", u.Host+":80")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not resolve address: %v", err)
+			return
 		}
 
 		//open a connection
@@ -133,15 +137,33 @@ func main() {
 		defer conn.Close()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not open connection: %v", err)
+			return
 		}
 
+		d = os.Args[findArgPos(os.Args, "-d")+1]
 		post.Write(conn, u, kvmap, d)
-		//read from connection
-		result, err := ioutil.ReadAll(conn)
+		status, result, err := post.Read(conn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading from connection :%v", err)
+			return
 		}
-		fmt.Printf("%s", result)
+		if findArg(os.Args, "-o") {
+			o = os.Args[findArgPos(os.Args, "-o")+1]
+			file, err := os.OpenFile(o, os.O_RDWR|os.O_CREATE, 0755)
+			defer file.Close()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "could not open file %s :%v", o, err)
+				return
+			}
+			fmt.Fprint(file, result)
+			return
+		}
+		if v || findArg(os.Args, "-v") {
+			fmt.Printf("Output:\n\n%s \r\n\n%s", status, result)
+		} else {
+			fmt.Printf("Output:\n\n%s", result)
+		}
+		return
 	}
 
 }
