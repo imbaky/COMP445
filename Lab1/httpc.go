@@ -39,19 +39,22 @@ func main() {
 
 	var h string
 	var d string
+	var o string
 	var v bool
 	flag.StringVar(&h, "h", "", "key value in the format key1:value1,key2,value2")
-	flag.BoolVar(&v,"v",false,"output the return status only")
-	flag.StringVar(&d, "d", "", "key value in the format key1:value1,key2,value2")
+	flag.BoolVar(&v, "v", false, "output the return status only")
+	flag.StringVar(&d, "d", "", "inline-data")
+	flag.StringVar(&o, "o", "", "file to write to")
 	flag.Parse()
 
-	fmt.Printf("v is %v\n",v)
 	kvmap := make(map[string]string)
-	for _, v := range strings.Split(h, ",") {
-		fmt.Printf("v %v\n", v)
-		pair := strings.Split(v, ":")
-		fmt.Printf("pair %v\n", pair)
-		kvmap[pair[0]] = pair[1]
+	if h != "" {
+		for _, v := range strings.Split(h, ",") {
+			fmt.Printf("v %v\n", v)
+			pair := strings.Split(v, ":")
+			fmt.Printf("pair %v\n", pair)
+			kvmap[pair[0]] = pair[1]
+		}
 	}
 
 	argsmap := make(map[string]bool)
@@ -70,7 +73,7 @@ func main() {
 		}
 	}
 
-	if argsmap["get"]== true {
+	if argsmap["get"] == true {
 
 		u, err := url.Parse("http://" + os.Args[len(os.Args)-1])
 		if err != nil {
@@ -90,20 +93,31 @@ func main() {
 		}
 
 		get.Write(conn, u, kvmap)
-		status,result,err := get.Read(conn)
+		status, result, err := get.Read(conn)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading from connection :%v", err)
 		}
-		if v {
-			fmt.Printf("Output:\n\n%s \r\n%s", status,result)
-		}else{
-			fmt.Printf("Output:\n\n%s",result)
+		if findArg(os.Args, "-o") {
+			o = os.Args[findArgPos(os.Args, "-o")+1]
+			file, err := os.OpenFile(o, os.O_RDWR|os.O_CREATE, 0755)
+			defer file.Close()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "could not open file %s :%v", o, err)
+				return
+			}
+			fmt.Fprint(file, result)
+			return
+		}
+		if v || findArg(os.Args, "-v") {
+			fmt.Printf("Output:\n\n%s \r\n\n%s", status, result)
+		} else {
+			fmt.Printf("Output:\n\n%s", result)
 		}
 		return
 	}
 
 	if argsmap["post"] {
-		
+
 		u, err := url.Parse("http://" + os.Args[len(os.Args)-1])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not parse url: %v", err)
@@ -121,7 +135,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "could not open connection: %v", err)
 		}
 
-		post.Write(conn, u, kvmap,d)
+		post.Write(conn, u, kvmap, d)
 		//read from connection
 		result, err := ioutil.ReadAll(conn)
 		if err != nil {
@@ -130,4 +144,22 @@ func main() {
 		fmt.Printf("%s", result)
 	}
 
+}
+
+func findArg(args []string, s string) bool {
+	for _, v := range args {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func findArgPos(args []string, s string) int {
+	for k, v := range args {
+		if v == s {
+			return k
+		}
+	}
+	return 0
 }
