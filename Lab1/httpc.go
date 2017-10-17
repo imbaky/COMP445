@@ -48,7 +48,7 @@ func main() {
 
 	kvmap := make(map[string]string)
 	content := os.Args[findArgPos(os.Args, "-h")+1]
-	if content != "" {
+	if content != "" && h != "" {
 		for _, v := range strings.Split(content, ",") {
 			pair := strings.Split(v, ":")
 			kvmap[pair[0]] = pair[1]
