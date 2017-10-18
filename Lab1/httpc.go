@@ -47,13 +47,16 @@ func main() {
 	flag.Parse()
 
 	kvmap := make(map[string]string)
-	content := os.Args[findArgPos(os.Args, "-h")+1]
-	if content != "" && h != "" {
-		for _, v := range strings.Split(content, ",") {
-			pair := strings.Split(v, ":")
-			kvmap[pair[0]] = pair[1]
+	if findArg(os.Args,"-h"){
+		content := os.Args[findArgPos(os.Args, "-h")+1]
+		if content != "" {
+			for _, v := range strings.Split(content, ",") {
+				pair := strings.Split(v, ":")
+				kvmap[pair[0]] = pair[1]
+			}
 		}
 	}
+	
 
 	argsmap := make(map[string]bool)
 	for _, arg := range os.Args {
@@ -73,7 +76,10 @@ func main() {
 
 	if argsmap["get"] == true {
 
-		u, err := url.Parse("http://" + os.Args[len(os.Args)-1])
+		u, err := url.ParseRequestURI(os.Args[len(os.Args)-1])
+		if(err != nil){
+			u, err = url.ParseRequestURI("http://" + os.Args[len(os.Args)-1])
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not parse url: %v", err)
 			return
@@ -119,8 +125,10 @@ func main() {
 	}
 
 	if argsmap["post"] {
-
-		u, err := url.Parse("http://" + os.Args[len(os.Args)-1])
+		u, err := url.ParseRequestURI(os.Args[len(os.Args)-1])
+		if(err != nil){
+			u, err = url.ParseRequestURI("http://" + os.Args[len(os.Args)-1])
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not parse url: %v", err)
 			return
