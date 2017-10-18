@@ -2,10 +2,10 @@ package get
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"strings"
-	"io/ioutil"
 )
 
 // Write writes the request to the tcp connection, being aware that the request is GET
@@ -25,11 +25,15 @@ func Write(conn net.Conn, u *url.URL, kv map[string]string) {
 			u.Path += arg
 		}
 	}
+	if u.RawQuery != "" {
+		fmt.Fprintf(conn, "GET /%s HTTP/1.0\r\nHost: www.%s\r\n\r\n", u.Path+"?"+u.RawQuery, u.Host)
+		return
+	}
 	fmt.Fprintf(conn, "GET /%s HTTP/1.0\r\nHost: www.%s\r\n\r\n", u.Path, u.Host)
 }
 
 // Read reads the response and returns the status and full output
-func Read(conn net.Conn) (string, string, error){
+func Read(conn net.Conn) (string, string, error) {
 	//read from connection
 	result, err := ioutil.ReadAll(conn)
 	// fmt.Printf("result %v\n",string(result))
