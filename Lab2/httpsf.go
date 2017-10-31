@@ -16,7 +16,9 @@ var p int
 var d string
 
 func response(w http.ResponseWriter, r *http.Request) {
-
+	r.ParseForm() // parse arguments
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	bodyString := string(bodyBytes)
 	if v {
 		fmt.Printf("%v %v %v \n", r.Method, r.URL, r.Proto)
 		fmt.Printf("Host: %v\n", r.Host)
@@ -27,8 +29,8 @@ func response(w http.ResponseWriter, r *http.Request) {
 				fmt.Printf("%v: %v \n", name, h)
 			}
 		}
+		fmt.Println("Body: " + bodyString)
 	}
-	r.ParseForm() // parse arguments
 
 	if r.Method == "GET" {
 		files, err := ioutil.ReadDir("." + r.URL.Path)
@@ -43,10 +45,8 @@ func response(w http.ResponseWriter, r *http.Request) {
 	}
 	if (r.Method == "POST") && r.URL.Path != "/" {
 		// write the whole body at once
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
-		bodyString := string(bodyBytes)
 
-		fileHandle, _ := os.Create("./" + r.URL.Path + ".txt")
+		fileHandle, _ := os.Create(d + r.URL.Path + ".txt")
 		writer := bufio.NewWriter(fileHandle)
 
 		fmt.Fprintln(writer, bodyString)
