@@ -76,13 +76,26 @@ func response(w http.ResponseWriter, r *http.Request) {
 	}
 	if (r.Method == "POST") && r.URL.Path != "/" {
 		// write the whole body at once
+		// get FileInfo structure describing file
+		_, err := os.Stat(d + r.URL.Path + ".txt")
+		if os.IsNotExist(err) {
+			fileHandle, _ := os.Create(d + r.URL.Path + ".txt")
+			writer := bufio.NewWriter(fileHandle)
+			fmt.Fprintln(writer, bodyString)
+			writer.Flush()
+			fileHandle.Close()
+		} else {
+			if r.FormValue("overwrite") == "true" {
+				fmt.Println("true")
+				fileHandle, _ := os.Create(d + r.URL.Path + ".txt")
+				writer := bufio.NewWriter(fileHandle)
+				fmt.Fprintln(writer, bodyString)
+				writer.Flush()
+				fileHandle.Close()
+			}
 
-		fileHandle, _ := os.Create(d + r.URL.Path + ".txt")
-		writer := bufio.NewWriter(fileHandle)
+		}
 
-		fmt.Fprintln(writer, bodyString)
-		writer.Flush()
-		fileHandle.Close()
 		fmt.Fprintf(w, bodyString)
 
 	}
