@@ -1,4 +1,14 @@
+
+*
+!*/
+!*.*
+
+!makefile
+
 # Binaries for programs and plugins
 *.exe
 *.zip
+
+# output text files 
 *.txt
+

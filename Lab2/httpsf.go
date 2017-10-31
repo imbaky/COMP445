@@ -19,6 +19,7 @@ var d string
 
 type file struct {
 	FileName string
+	content  string
 }
 
 func response(w http.ResponseWriter, r *http.Request) {
@@ -40,37 +41,53 @@ func response(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "GET" {
-		files, err := ioutil.ReadDir("." + r.URL.Path)
-		if err != nil {
-			http.Error(w, "directory not found", http.StatusNotFound)
-			log.Println(err)
-		}
 		var a []file
+		if r.URL.Path == "/" {
+			files, err := ioutil.ReadDir("." + r.URL.Path)
+			if err != nil {
+				http.Error(w, "directory not found", http.StatusNotFound)
+				log.Println(err)
+			}
+			for _, f := range files {
+				a = append(a, file{f.Name(), ""})
+			}
+		} else {
 
-		for _, f := range files {
-			a = append(a, file{f.Name()})
+			efile, err := ioutil.ReadFile("." + r.URL.Path)
+			fmt.Println(fmt.Sprintf("%s", efile))
+			a = append(a, file{"." + r.URL.Path, fmt.Sprintf("%s", efile)})
+			if err != nil {
+				http.Error(w, "File not found", http.StatusNotFound)
+				log.Println(err)
+			}
 		}
+
+		var body string
 		switch r.Header.Get("accept") {
 		case "application/json":
 			jsonData, _ := json.Marshal(a)
-			fmt.Fprintf(w, fmt.Sprintf("%s", jsonData))
+			body = fmt.Sprintf("%s", jsonData)
 			break
 		case "text/html":
 			var htmlData string
 			for _, element := range a {
 				htmlData += fmt.Sprintf("<li>%s</li>\n", element.FileName)
 			}
-			fmt.Fprintf(w, fmt.Sprintf("<html>\n<body>\n<ul>\n%s</ul>\n</body>\n</html>\n", htmlData))
+			body = fmt.Sprintf("<html>\n<body>\n<ul>\n%s</ul>\n</body>\n</html>\n", htmlData)
 			break
 		case "text/xml":
 			xmlData, _ := xml.Marshal(a)
-			fmt.Fprintf(w, fmt.Sprintf("%s", xmlData))
+			body = fmt.Sprintf("%s", xmlData)
 			break
 		default:
 			for _, element := range a {
-				fmt.Fprintf(w, element.FileName+"\n")
+				body = element.FileName + " \n" + element.content + "\n"
 			}
 			break
+		}
+		if v {
+			fmt.Fprintf(w, "Message Body:\n")
+			fmt.Fprintf(w, body)
 		}
 
 	}
