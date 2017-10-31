@@ -52,19 +52,19 @@ func response(w http.ResponseWriter, r *http.Request) {
 		}
 		switch r.Header.Get("accept") {
 		case "application/json":
-			json_data, _ := json.Marshal(a)
-			fmt.Fprintf(w, fmt.Sprintf("%s", json_data))
+			jsonData, _ := json.Marshal(a)
+			fmt.Fprintf(w, fmt.Sprintf("%s", jsonData))
 			break
 		case "text/html":
-			var html_data string
+			var htmlData string
 			for _, element := range a {
-				html_data += fmt.Sprintf("<li>%s</li>\n", element.FileName)
+				htmlData += fmt.Sprintf("<li>%s</li>\n", element.FileName)
 			}
-			fmt.Fprintf(w, fmt.Sprintf("<html>\n<body>\n<ul>\n%s</ul>\n</body>\n</html>\n", html_data))
+			fmt.Fprintf(w, fmt.Sprintf("<html>\n<body>\n<ul>\n%s</ul>\n</body>\n</html>\n", htmlData))
 			break
 		case "text/xml":
-			xml_data, _ := xml.Marshal(a)
-			fmt.Fprintf(w, fmt.Sprintf("%s", xml_data))
+			xmlData, _ := xml.Marshal(a)
+			fmt.Fprintf(w, fmt.Sprintf("%s", xmlData))
 			break
 		default:
 			for _, element := range a {
