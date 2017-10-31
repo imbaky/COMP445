@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +17,10 @@ var v bool
 var p int
 var d string
 
+type file struct {
+	FileName string
+}
+
 func response(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm() // parse arguments
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
@@ -25,6 +31,7 @@ func response(w http.ResponseWriter, r *http.Request) {
 		// Loop through headers
 		for name, headers := range r.Header {
 			name = strings.ToLower(name)
+
 			for _, h := range headers {
 				fmt.Printf("%v: %v \n", name, h)
 			}
@@ -38,10 +45,34 @@ func response(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "directory not found", http.StatusNotFound)
 			log.Println(err)
 		}
+		var a []file
 
 		for _, f := range files {
-			fmt.Fprintf(w, f.Name()+"\n")
+			a = append(a, file{f.Name()})
 		}
+		switch r.Header.Get("accept") {
+		case "application/json":
+			json_data, _ := json.Marshal(a)
+			fmt.Fprintf(w, fmt.Sprintf("%s", json_data))
+			break
+		case "text/html":
+			var html_data string
+			for _, element := range a {
+				html_data += fmt.Sprintf("<li>%s</li>\n", element.FileName)
+			}
+			fmt.Fprintf(w, fmt.Sprintf("<html>\n<body>\n<ul>\n%s</ul>\n</body>\n</html>\n", html_data))
+			break
+		case "text/xml":
+			xml_data, _ := xml.Marshal(a)
+			fmt.Fprintf(w, fmt.Sprintf("%s", xml_data))
+			break
+		default:
+			for _, element := range a {
+				fmt.Fprintf(w, element.FileName+"\n")
+			}
+			break
+		}
+
 	}
 	if (r.Method == "POST") && r.URL.Path != "/" {
 		// write the whole body at once
