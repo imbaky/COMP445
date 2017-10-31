@@ -8,14 +8,29 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
-func response(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm() // parse arguments
-	fmt.Println()
-	if r.Method == "GET" {
-		fmt.Println("path", r.URL.Path)
+var v bool
+var p int
+var d string
 
+func response(w http.ResponseWriter, r *http.Request) {
+
+	if v {
+		fmt.Printf("%v %v %v \n", r.Method, r.URL, r.Proto)
+		fmt.Printf("Host: %v\n", r.Host)
+		// Loop through headers
+		for name, headers := range r.Header {
+			name = strings.ToLower(name)
+			for _, h := range headers {
+				fmt.Printf("%v: %v \n", name, h)
+			}
+		}
+	}
+	r.ParseForm() // parse arguments
+
+	if r.Method == "GET" {
 		files, err := ioutil.ReadDir("." + r.URL.Path)
 		if err != nil {
 			http.Error(w, "directory not found", http.StatusNotFound)
@@ -53,10 +68,6 @@ func main() {
 	requested files. Default is the current directory when launching the
 	application.`
 
-	var v bool
-	var p int
-	var d string
-
 	flag.BoolVar(&v, "v", false, "Prints debugging messages")
 	flag.StringVar(&d, "d", "./", "Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
 	flag.IntVar(&p, "p", 8080, "Specifies the port number that the server will listen and serve at. Default is 8080")
@@ -69,11 +80,16 @@ func main() {
 	if argsmap["help"] {
 		fmt.Println(helpStr)
 	} else {
-		http.HandleFunc("/", response)           // set router
-		err := http.ListenAndServe(":9090", nil) // set listen port
+		http.HandleFunc("/", response) // set router
+		port := fmt.Sprintf(":%d", p)
+		if v {
+			fmt.Printf("Listening to Localhost%s\n", port)
+		}
+		err := http.ListenAndServe(port, nil) // set listen port
 		if err != nil {
 			log.Fatal("ListenAndServe: ", err)
 		}
+
 	}
 
 }
