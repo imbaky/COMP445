@@ -31,9 +31,20 @@ type Request struct {
 
 // Response struct definition
 type Response struct {
-	Status  string
-	headers map[string]string
-	body    string
+	HTTPVersion string
+	Status      string
+	Error       string
+	Headers     map[string]string
+	Body        string
+}
+
+func (response Response) toString() (responseText string) {
+	responseText = fmt.Sprintf("%s %s %s \r\n", response.HTTPVersion, response.Error, response.Status)
+	for name, value := range response.Headers {
+		responseText += fmt.Sprintf("%s: %s \r\n", name, value)
+	}
+	responseText += fmt.Sprintf("%s \r\n", response.Body)
+	return
 }
 
 //Flag variables
@@ -118,7 +129,8 @@ func handleConn(conn net.Conn) {
 		return
 	}
 
-	var response string
+	var response Response
+	response = Response{request.httpversion, "OK", "200", make(map[string]string), ""}
 
 	// GET method
 	if request.method == "GET" {
@@ -126,20 +138,18 @@ func handleConn(conn net.Conn) {
 		if request.URL.Path == "/" {
 			files, err := ioutil.ReadDir("." + request.URL.Path)
 			if err != nil {
-				response += request.httpversion + " 404 OK \r\n"
+				response.Error = "404"
 				log.Println(err)
 			}
-			response += request.httpversion + " 200 OK \r\n"
 			for _, f := range files {
 				a = append(a, File{f.Name(), ""})
 			}
 		} else {
-			response += request.httpversion + " 200 OK \r\n"
 			efile, err := ioutil.ReadFile("." + request.URL.Path)
 			fmt.Println(fmt.Sprintf("%s", efile))
 			a = append(a, File{"." + request.URL.Path, fmt.Sprintf("%s", efile)})
 			if err != nil {
-				response += request.httpversion + " 404 OK \r\n"
+				response.Error = "404"
 				log.Println(err)
 			}
 		}
@@ -171,8 +181,7 @@ func handleConn(conn net.Conn) {
 			verbose(body)
 			break
 		}
-		response += "Message Body:\n"
-		response += body + "\r\n"
+		response.Body = body
 
 	}
 	// POST method
@@ -201,12 +210,13 @@ func handleConn(conn net.Conn) {
 			}
 
 		}
-		response += request.body
+		response.Body = request.body
 
 	}
-	verbose(fmt.Sprintln(response + "\r\n"))
 
-	if _, we := conn.Write([]byte(response)); we != nil {
+	verbose(fmt.Sprint(response.toString() + "\r\n"))
+
+	if _, we := conn.Write([]byte(response.toString())); we != nil {
 		fmt.Fprintf(os.Stderr, "write error %v\n", we)
 	}
 	conn.Close()
