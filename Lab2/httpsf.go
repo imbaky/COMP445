@@ -14,23 +14,26 @@ import (
 	"strings"
 )
 
-/*
-*	File struct definition
- */
+// File struct definition
 type File struct {
 	FileName string
 	content  string
 }
 
-/*
-*	Request struct definition
- */
+// Request struct definition
 type Request struct {
 	method      string
 	URL         *url.URL
 	httpversion string
 	headers     map[string]string
 	body        string
+}
+
+// Response struct definition
+type Response struct {
+	Status  string
+	headers map[string]string
+	body    string
 }
 
 //Flag variables
@@ -40,6 +43,7 @@ var d string
 
 func main() {
 
+	// cli tool usage info message to be displayed
 	helpStr := `httpfs is a simple file server.
 		usage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]
 		 -v Prints debugging messages.
@@ -54,11 +58,15 @@ func main() {
 	flag.IntVar(&p, "p", 8080, "Specifies the port number that the server will listen and serve at. Default is 8080")
 	flag.Parse()
 
-	argsmap := make(map[string]bool)
+	//Checks if help command is present
+	var help bool
 	for _, arg := range os.Args {
-		argsmap[arg] = true
+		if arg == "help" {
+			help = true
+		}
 	}
-	if argsmap["help"] {
+
+	if help {
 		fmt.Println(helpStr)
 	} else {
 		port := fmt.Sprintf(":%d", p)
