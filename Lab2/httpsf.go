@@ -183,13 +183,17 @@ func handleConn(conn net.Conn) {
 				writer.Flush()
 				fileHandle.Close()
 			} else {
-				if request.URL.Query()["overwrite"][0] == "true" {
-					fmt.Println("true")
-					fileHandle, _ := os.Create(d + request.URL.Path + ".txt")
-					writer := bufio.NewWriter(fileHandle)
-					fmt.Fprintln(writer, request.body)
-					writer.Flush()
-					fileHandle.Close()
+				if request.URL.Query()["overwrite"] != nil {
+					if request.URL.Query()["overwrite"][0] == "true" {
+						if v {
+							fmt.Println("Overwrite is true")
+						}
+						fileHandle, _ := os.Create(d + request.URL.Path + ".txt")
+						writer := bufio.NewWriter(fileHandle)
+						fmt.Fprintln(writer, request.body)
+						writer.Flush()
+						fileHandle.Close()
+					}
 				}
 
 			}
