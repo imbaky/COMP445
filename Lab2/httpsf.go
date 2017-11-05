@@ -201,7 +201,6 @@ func handleConn(conn net.Conn) {
 			}
 
 		}
-
 		response += request.body
 
 	}
@@ -235,10 +234,7 @@ func parseRequest(buf []byte) (request Request) {
 				}
 
 			} else {
-				if i < len(lines) {
-					body = lines[i+1]
-				}
-				break
+				body += lines[i]
 			}
 
 		}
