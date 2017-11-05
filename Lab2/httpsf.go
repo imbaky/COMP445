@@ -136,7 +136,7 @@ func handleConn(conn net.Conn) {
 	if request.method == "GET" {
 		var a []File
 		if request.URL.Path == "/" {
-			files, err := ioutil.ReadDir("." + request.URL.Path)
+			files, err := ioutil.ReadDir(d + request.URL.Path)
 			if err != nil {
 				response.Error = "404"
 				log.Println(err)
@@ -145,7 +145,7 @@ func handleConn(conn net.Conn) {
 				a = append(a, File{f.Name(), ""})
 			}
 		} else {
-			efile, err := ioutil.ReadFile("." + request.URL.Path)
+			efile, err := ioutil.ReadFile(d + request.URL.Path)
 			fmt.Println(fmt.Sprintf("%s", efile))
 			a = append(a, File{"." + request.URL.Path, fmt.Sprintf("%s", efile)})
 			if err != nil {
