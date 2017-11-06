@@ -146,6 +146,7 @@ func handleConn(conn net.Conn) {
 			files, err := ioutil.ReadDir(d + request.URL.Path)
 			if err != nil {
 				response.Error = "404"
+				response.Body = "Current Directory does not exist, please contact server admin"
 				log.Println(err)
 			}
 			for _, f := range files {
@@ -158,6 +159,7 @@ func handleConn(conn net.Conn) {
 			isFile = true
 			if err != nil {
 				response.Error = "404"
+				response.Body = "Requested file does not exist"
 				log.Println(err)
 			}
 		}
