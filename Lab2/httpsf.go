@@ -206,11 +206,17 @@ func handleConn(conn net.Conn) {
 					fmt.Fprintln(writer, request.body)
 					writer.Flush()
 					fileHandle.Close()
+					response.Body = request.body
+				} else {
+					response.Body = "File exists but cannot be re-written"
+					response.Error = "401"
 				}
+			} else {
+				response.Body = "File exists but cannot be re-written"
+				response.Error = "401"
 			}
 
 		}
-		response.Body = request.body
 
 	}
 
