@@ -72,7 +72,7 @@ func main() {
 		application.`
 
 	flag.BoolVar(&v, "v", false, "Prints debugging messages")
-	flag.StringVar(&d, "d", "./", "Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
+	flag.StringVar(&d, "d", ".", "Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
 	flag.IntVar(&p, "p", 8080, "Specifies the port number that the server will listen and serve at. Default is 8080")
 	flag.Parse()
 
@@ -147,7 +147,7 @@ func handleConn(conn net.Conn) {
 		} else {
 			efile, err := ioutil.ReadFile(d + request.URL.Path)
 			fmt.Println(fmt.Sprintf("%s", efile))
-			a = append(a, File{"." + request.URL.Path, fmt.Sprintf("%s", efile)})
+			a = append(a, File{request.URL.Path, fmt.Sprintf("%s", efile)})
 			if err != nil {
 				response.Error = "404"
 				log.Println(err)
@@ -155,6 +155,7 @@ func handleConn(conn net.Conn) {
 		}
 
 		var body string
+
 		switch request.headers["accept"] {
 		case "application/json":
 			jsonData, _ := json.Marshal(a)
@@ -188,9 +189,9 @@ func handleConn(conn net.Conn) {
 	if (request.method == "POST") && request.URL.Path != "/" {
 		// write the whole body at once
 		// get FileInfo structure describing file
-		_, err := os.Stat(d + request.URL.Path + ".txt")
+		_, err := os.Stat(d + request.URL.Path)
 		if os.IsNotExist(err) {
-			fileHandle, _ := os.Create(d + request.URL.Path + ".txt")
+			fileHandle, _ := os.Create(d + request.URL.Path)
 			writer := bufio.NewWriter(fileHandle)
 			fmt.Fprintln(writer, request.body)
 			writer.Flush()
@@ -201,7 +202,7 @@ func handleConn(conn net.Conn) {
 
 					verbose("Overwrite is true")
 
-					fileHandle, _ := os.Create(d + request.URL.Path + ".txt")
+					fileHandle, _ := os.Create(d + request.URL.Path)
 					writer := bufio.NewWriter(fileHandle)
 					fmt.Fprintln(writer, request.body)
 					writer.Flush()
