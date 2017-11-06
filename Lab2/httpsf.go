@@ -112,7 +112,7 @@ func handleConn(conn net.Conn) {
 	defer conn.Close()
 	fmt.Printf("Request recieved from %v\n", conn.RemoteAddr())
 
-	buf := make([]byte, 1024)
+	buf := make([]byte, 1028)
 	n, re := conn.Read(buf)
 	if re != nil {
 		fmt.Fprintf(os.Stderr, "read error %v\n", re)
@@ -234,16 +234,20 @@ func parseRequest(buf []byte) (request Request) {
 
 	if len(head) > 2 {
 		u, _ := url.Parse(head[1])
+
 		headers := make(map[string]string)
 		var body string
+		isBodyData := false
 		for i := 1; i < len(lines); i += 2 {
-			if lines[i] != "" {
+			if lines[i] != "" && !isBodyData {
 				line := strings.Split(lines[i], ": ")
 				if len(line) > 1 {
 					headers[line[0]] = line[1]
+				} else {
+					isBodyData = true
 				}
-
-			} else {
+			}
+			if isBodyData {
 				body += lines[i]
 			}
 
