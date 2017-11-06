@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./http"
 	"bufio"
 	"encoding/json"
 	"encoding/xml"
@@ -9,43 +10,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/url"
 	"os"
 	"strings"
 )
-
-// File struct definition
-type File struct {
-	FileName string
-	content  string
-}
-
-// Request struct definition
-type Request struct {
-	method      string
-	URL         *url.URL
-	httpversion string
-	headers     map[string]string
-	body        string
-}
-
-// Response struct definition
-type Response struct {
-	HTTPVersion string
-	Status      string
-	Error       string
-	Headers     map[string]string
-	Body        string
-}
-
-func (response Response) toString() (responseText string) {
-	responseText = fmt.Sprintf("%s %s %s \r\n", response.HTTPVersion, response.Error, response.Status)
-	for name, value := range response.Headers {
-		responseText += fmt.Sprintf("%s: %s \r\n", name, value)
-	}
-	responseText += fmt.Sprintf("%s \r\n", response.Body)
-	return
-}
 
 //Flag variables
 var v bool
@@ -121,24 +88,24 @@ func handleConn(conn net.Conn) {
 	verbose(fmt.Sprintln("\n", string(buf)))
 
 	// Parsing request into Request struct
-	var request Request
+	var request http.Request
 	if n > 0 {
-		request = parseRequest(buf)
+		request = http.ParseRequest(buf)
 	} else {
 		verbose("Invalid Request")
 		return
 	}
 	//Create a response
-	var response Response
+	var response http.Response
 	//intializing the response
-	response = Response{request.httpversion, "OK", "200", make(map[string]string), ""}
+	response = http.Response{request.Httpversion, "OK", "200", make(map[string]string), ""}
 
 	//remove parent directory ".." in path to prevent user from accessing anything not in this directory
 	request.URL.Path = strings.Replace(request.URL.Path, "..", "", -1)
 
 	// GET method
-	if request.method == "GET" {
-		var a []File
+	if request.Method == "GET" {
+		var a []http.File
 		response.Headers["Content-Type"] = "text/plain"
 		response.Headers["Content-Disposition"] = "inline"
 		isFile := false
@@ -150,12 +117,12 @@ func handleConn(conn net.Conn) {
 				log.Println(err)
 			}
 			for _, f := range files {
-				a = append(a, File{f.Name(), ""})
+				a = append(a, http.File{f.Name(), ""})
 			}
 		} else {
 			efile, err := ioutil.ReadFile(d + request.URL.Path)
 			fmt.Println(fmt.Sprintf("%s", efile))
-			a = append(a, File{request.URL.Path, fmt.Sprintf("%s", efile)})
+			a = append(a, http.File{request.URL.Path, fmt.Sprintf("%s", efile)})
 			isFile = true
 			if err != nil {
 				response.Error = "404"
@@ -166,7 +133,7 @@ func handleConn(conn net.Conn) {
 
 		var body string
 
-		switch request.headers["accept"] {
+		switch request.Headers["accept"] {
 		case "application/json":
 			jsonData, _ := json.Marshal(a)
 			body = fmt.Sprintf("%s", jsonData)
@@ -190,26 +157,28 @@ func handleConn(conn net.Conn) {
 			break
 		default:
 			for _, element := range a {
-				body += element.FileName + " \n" + element.content + "\n"
+				body += element.FileName + " \n" + element.Content + "\n"
 			}
 			verbose(body)
 			break
 		}
-		if isFile {
-			response.Headers["Content-Disposition"] = "attachment; filename=\"" + a[0].FileName + "\""
+		if response.Error == "200" {
+			if isFile {
+				response.Headers["Content-Disposition"] = "attachment; filename=\"" + a[0].FileName + "\""
+			}
+			response.Body = body
 		}
-		response.Body = body
 
 	}
 	// POST method
-	if (request.method == "POST") && request.URL.Path != "/" {
+	if (request.Method == "POST") && request.URL.Path != "/" {
 		// write the whole body at once
 		// get FileInfo structure describing file
 		_, err := os.Stat(d + request.URL.Path)
 		if os.IsNotExist(err) {
 			fileHandle, _ := os.Create(d + request.URL.Path)
 			writer := bufio.NewWriter(fileHandle)
-			fmt.Fprintln(writer, request.body)
+			fmt.Fprintln(writer, request.Body)
 			writer.Flush()
 			fileHandle.Close()
 		} else {
@@ -220,10 +189,10 @@ func handleConn(conn net.Conn) {
 
 					fileHandle, _ := os.Create(d + request.URL.Path)
 					writer := bufio.NewWriter(fileHandle)
-					fmt.Fprintln(writer, request.body)
+					fmt.Fprintln(writer, request.Body)
 					writer.Flush()
 					fileHandle.Close()
-					response.Body = request.body
+					response.Body = request.Body
 				} else {
 					response.Body = "File exists but cannot be re-written"
 					response.Error = "401"
@@ -236,52 +205,18 @@ func handleConn(conn net.Conn) {
 		}
 
 	} else {
-		if (request.method == "POST") && request.URL.Path == "/" {
+		if (request.Method == "POST") && request.URL.Path == "/" {
 			response.Error = "400"
 			response.Body = "Bad Request"
 		}
 
 	}
 
-	verbose(fmt.Sprint(response.toString() + "\r\n"))
+	verbose(fmt.Sprint(response.ToString() + "\r\n"))
 
-	if _, we := conn.Write([]byte(response.toString())); we != nil {
+	if _, we := conn.Write([]byte(response.ToString())); we != nil {
 		fmt.Fprintf(os.Stderr, "write error %v\n", we)
 	}
 	conn.Close()
 
-}
-
-//Function to take buffer data and parse it into Request
-func parseRequest(buf []byte) (request Request) {
-	var lines []string
-	//Split each line
-	lines = strings.Split(string(buf), "\r\n")
-
-	// Split the first line with the request definition
-	head := strings.Split(lines[0], " ")
-
-	if len(head) > 2 {
-		u, _ := url.Parse(head[1])
-
-		headers := make(map[string]string)
-		var body string
-		isBodyData := false
-		for i := 1; i < len(lines); i += 2 {
-			if lines[i] != "" && !isBodyData {
-				line := strings.Split(lines[i], ": ")
-				if len(line) > 1 {
-					headers[line[0]] = line[1]
-				} else {
-					isBodyData = true
-				}
-			}
-			if isBodyData {
-				body += lines[i]
-			}
-
-		}
-		request = Request{head[0], u, head[2], headers, body}
-	}
-	return
 }
