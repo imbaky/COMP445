@@ -1,7 +1,6 @@
 package main
 
 import (
-	"./http"
 	"bufio"
 	"encoding/json"
 	"encoding/xml"
@@ -12,6 +11,8 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"./http"
 )
 
 //Flag variables
@@ -99,7 +100,6 @@ func handleConn(conn net.Conn) {
 	var response http.Response
 	//intializing the response
 	response = http.Response{request.Httpversion, "OK", "200", make(map[string]string), ""}
-
 	//remove parent directory ".." in path to prevent user from accessing anything not in this directory
 	request.URL.Path = strings.Replace(request.URL.Path, "..", "", -1)
 
@@ -113,7 +113,7 @@ func handleConn(conn net.Conn) {
 			files, err := ioutil.ReadDir(d + request.URL.Path)
 			if err != nil {
 				response.Error = "404"
-				response.Body = "Home directory does not exist, please contact server admin"
+				response.Status = "Home directory does not exist, please contact server admin"
 				log.Println(err)
 			}
 			for _, f := range files {
@@ -126,7 +126,7 @@ func handleConn(conn net.Conn) {
 			isFile = true
 			if err != nil {
 				response.Error = "404"
-				response.Body = "Requested file does not exist"
+				response.Status = "Requested file does not exist"
 				log.Println(err)
 			}
 		}
@@ -192,13 +192,13 @@ func handleConn(conn net.Conn) {
 					fmt.Fprintln(writer, request.Body)
 					writer.Flush()
 					fileHandle.Close()
-					response.Body = request.Body
+					response.Body = "File successfully written!!"
 				} else {
-					response.Body = "File exists but cannot be re-written"
+					response.Status = "File exists but cannot be re-written"
 					response.Error = "401"
 				}
 			} else {
-				response.Body = "File exists but cannot be re-written"
+				response.Status = "File exists but cannot be re-written"
 				response.Error = "401"
 			}
 
@@ -207,7 +207,7 @@ func handleConn(conn net.Conn) {
 	} else {
 		if (request.Method == "POST") && request.URL.Path == "/" {
 			response.Error = "400"
-			response.Body = "Bad Request"
+			response.Status = "Bad Request"
 		}
 
 	}

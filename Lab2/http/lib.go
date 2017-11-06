@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // File struct definition
@@ -33,10 +34,14 @@ type Response struct {
 //converts response to string
 func (response Response) ToString() (responseText string) {
 	responseText = fmt.Sprintf("%s %s %s \r\n", response.HTTPVersion, response.Error, response.Status)
+	response.Headers["Server"] = "COMP445/2.0 (Assignment)"
+	now := time.Now()
+	response.Headers["Last-Modified"] = now.Format("Mon Jan 2 15:04:05 MST 2006")
+	response.Headers["Content-Length"] = fmt.Sprintf("%d", len(response.Body))
 	for name, value := range response.Headers {
 		responseText += fmt.Sprintf("%s: %s \r\n", name, value)
 	}
-	responseText += fmt.Sprintf("%s \r\n", response.Body)
+	responseText += fmt.Sprintf("%s \r\n\r\n", response.Body)
 	return
 }
 
