@@ -146,7 +146,7 @@ func handleConn(conn net.Conn) {
 			files, err := ioutil.ReadDir(d + request.URL.Path)
 			if err != nil {
 				response.Error = "404"
-				response.Body = "Current Directory does not exist, please contact server admin"
+				response.Body = "Home directory does not exist, please contact server admin"
 				log.Println(err)
 			}
 			for _, f := range files {
