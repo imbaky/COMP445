@@ -229,6 +229,9 @@ func handleConn(conn net.Conn) {
 
 		}
 
+	} else {
+		response.Error = "400"
+		response.Body = "Bad Request"
 	}
 
 	verbose(fmt.Sprint(response.toString() + "\r\n"))
