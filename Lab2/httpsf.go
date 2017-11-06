@@ -128,9 +128,13 @@ func handleConn(conn net.Conn) {
 		verbose("Invalid Request")
 		return
 	}
-
+	//Create a response
 	var response Response
+	//intializing the response
 	response = Response{request.httpversion, "OK", "200", make(map[string]string), ""}
+
+	//remove parent directory ".." in path to prevent user from accessing anything not in this directory
+	request.URL.Path = strings.Replace(request.URL.Path, "..", "", -1)
 
 	// GET method
 	if request.method == "GET" {
@@ -230,8 +234,11 @@ func handleConn(conn net.Conn) {
 		}
 
 	} else {
-		response.Error = "400"
-		response.Body = "Bad Request"
+		if (request.method == "POST") && request.URL.Path == "/" {
+			response.Error = "400"
+			response.Body = "Bad Request"
+		}
+
 	}
 
 	verbose(fmt.Sprint(response.toString() + "\r\n"))
