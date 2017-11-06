@@ -135,6 +135,9 @@ func handleConn(conn net.Conn) {
 	// GET method
 	if request.method == "GET" {
 		var a []File
+		response.Headers["Content-Type"] = "text/plain"
+		response.Headers["Content-Disposition"] = "inline"
+		isFile := false
 		if request.URL.Path == "/" {
 			files, err := ioutil.ReadDir(d + request.URL.Path)
 			if err != nil {
@@ -148,6 +151,7 @@ func handleConn(conn net.Conn) {
 			efile, err := ioutil.ReadFile(d + request.URL.Path)
 			fmt.Println(fmt.Sprintf("%s", efile))
 			a = append(a, File{request.URL.Path, fmt.Sprintf("%s", efile)})
+			isFile = true
 			if err != nil {
 				response.Error = "404"
 				log.Println(err)
@@ -161,6 +165,7 @@ func handleConn(conn net.Conn) {
 			jsonData, _ := json.Marshal(a)
 			body = fmt.Sprintf("%s", jsonData)
 			verbose(body)
+			response.Headers["Content-Type"] = "application/json"
 			break
 		case "text/html":
 			var htmlData string
@@ -169,11 +174,13 @@ func handleConn(conn net.Conn) {
 			}
 			body = fmt.Sprintf("<html>\n<body>\n<ul>\n%s</ul>\n</body>\n</html>\n", htmlData)
 			verbose(body)
+			response.Headers["Content-Type"] = "text/html"
 			break
 		case "text/xml":
 			xmlData, _ := xml.Marshal(a)
 			body = fmt.Sprintf("%s", xmlData)
 			verbose(body)
+			response.Headers["Content-Type"] = "text/xml"
 			break
 		default:
 			for _, element := range a {
@@ -181,6 +188,9 @@ func handleConn(conn net.Conn) {
 			}
 			verbose(body)
 			break
+		}
+		if isFile {
+			response.Headers["Content-Disposition"] = "attachment; filename=\"" + a[0].FileName + "\""
 		}
 		response.Body = body
 
