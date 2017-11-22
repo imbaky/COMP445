@@ -1,10 +1,14 @@
 package server
 
 import (
+	"encoding/binary"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/imbaky/COMP445/lab3/packet"
 )
 
 // File struct definition
@@ -31,6 +35,72 @@ type Response struct {
 	Body        string
 }
 
+type Connection struct {
+	Conn       *net.UDPConn
+	Timeout    int
+	Sequence   uint32
+	WindowSize uint32
+}
+
+func Listen(host, port string, timeout int) (*Connection, error) {
+	addr, err := net.ResolveUDPAddr("udp", port)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return nil, err
+	}
+	connection := Connection{conn, timeout, 0, 0}
+	return &connection, nil
+}
+
+func (conn *Connection) readPacket() packet.Packet {
+	buf := make([]byte, 1024)
+	n, _, _ := conn.Conn.ReadFromUDP(buf)
+	pkt, _ := packet.FromBytes(buf[0:n])
+	return pkt
+}
+
+func (conn *Connection) Write(pkt packet.Packet) error {
+	_, err := conn.Conn.Write(pkt.Bytes())
+	return err
+}
+
+func Establish(conn *Connection) bool {
+	c := make(chan packet.Packet, 1)
+	pkt := conn.readPacket()
+	if pkt.PType != packet.SYN {
+		return false
+	}
+	seq := make([]byte, 4)
+	binary.LittleEndian.PutUint32(seq, conn.WindowSize)
+	synack, err := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, []byte{})
+	if err != nil {
+		return false
+	}
+	err = conn.Write(synack)
+	if err != nil {
+		return false
+	}
+	for {
+		go func(conn *Connection) {
+			c <- conn.readPacket()
+		}(conn)
+
+		select {
+		case <-time.After(time.Second * time.Duration(conn.Timeout)):
+			conn.Write(synack)
+		case res := <-c:
+			if res.PType == packet.ACK {
+				return true
+			}
+			conn.Write(synack)
+		}
+	}
+	return false
+}
+
 //converts response to string
 func (response Response) ToString() (responseText string) {
 	responseText = fmt.Sprintf("%s %s %s \r\n", response.HTTPVersion, response.Error, response.Status)
@@ -43,6 +113,10 @@ func (response Response) ToString() (responseText string) {
 	}
 	responseText += fmt.Sprintf("%s \r\n\r\n", response.Body)
 	return
+}
+
+func formRequest(conn *net.UDPConn) []byte {
+
 }
 
 //Function to take buffer data and parse it into Request
