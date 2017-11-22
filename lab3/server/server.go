@@ -2,74 +2,79 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net"
-	"os"
+	"net/url"
+	"strings"
+	"time"
 )
 
-//Server holds the pertinent information
-type server struct {
-	Host       string
-	Port       string
-	Protocol   string
-	PathString string
-	dir        path
-	Debug      bool
+// File struct definition
+type File struct {
+	FileName string
+	Content  string
 }
 
-//Server returns the server struct
-func Server(host, port, protocol, path string, debug bool) (*server, error) {
-	if host == "" {
-		host = "localhost"
-	}
-	if port == "" {
-		host = "8080"
-	}
-	if protocol == "" {
-		protocol = "tcp"
-	}
-	if path == "" {
-		path = "."
-	}
-	dir, err := os.Open(s.Dir)
-	if err != nil {
-		return nil, err
-	}
-	defer dir.Close()
-	if fi, err := dir.Stat(); err != nil || fi.IsDir() {
-		return nil, err
-	}
-	return server{host, port, protocol, dir, path, debug}, err
+// Request struct definition
+type Request struct {
+	Method      string
+	URL         *url.URL
+	Httpversion string
+	Headers     map[string]string
+	Body        string
 }
 
-//Run start the server. It begins to listen for connections and handles those connections
-func (s *server) Run() error {
+// Response struct definition
+type Response struct {
+	HTTPVersion string
+	Status      string
+	Error       string
+	Headers     map[string]string
+	Body        string
+}
 
-	listener, err := net.Listen(s.Protocol, s.Host+":"+s.Port)
-	if err != nil {
-		return err
+//converts response to string
+func (response Response) ToString() (responseText string) {
+	responseText = fmt.Sprintf("%s %s %s \r\n", response.HTTPVersion, response.Error, response.Status)
+	response.Headers["Server"] = "COMP445/2.0 (Assignment)"
+	now := time.Now()
+	response.Headers["Last-Modified"] = now.Format("Mon Jan 2 15:04:05 MST 2006")
+	response.Headers["Content-Length"] = fmt.Sprintf("%d", len(response.Body))
+	for name, value := range response.Headers {
+		responseText += fmt.Sprintf("%s: %s \r\n", name, value)
 	}
-	// Close the listener when the application closes.
-	defer listener.Close()
-	fmt.Println("listening on " + s.Host + ":" + s.Port)
+	responseText += fmt.Sprintf("%s \r\n\r\n", response.Body)
+	return
+}
 
-	for {
-		// Listen for an incoming connection.
-		conn, err := listener.Accept()
-		if err != nil {
-			return err
+//Function to take buffer data and parse it into Request
+func ParseRequest(buf []byte) (request Request) {
+	var lines []string
+	//Split each line
+	lines = strings.Split(string(buf), "\r\n")
+
+	// Split the first line with the request definition
+	head := strings.Split(lines[0], " ")
+
+	if len(head) > 2 {
+		u, _ := url.Parse(head[1])
+
+		headers := make(map[string]string)
+		var body string
+		isBodyData := false
+		for i := 1; i < len(lines); i += 2 {
+			if lines[i] != "" && !isBodyData {
+				line := strings.Split(lines[i], ": ")
+				if len(line) > 1 {
+					headers[line[0]] = line[1]
+				} else {
+					isBodyData = true
+				}
+			}
+			if isBodyData {
+				body += lines[i]
+			}
+
 		}
-		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+		request = Request{head[0], u, head[2], headers, body}
 	}
-}
-
-// Handles incoming requests.
-func handleRequest(conn net.Conn) {
-	defer conn.Close()
-	request, err := ioutil.ReadAll(conn)
-	if err != nil {
-		fmt.Printf("could not read connection %v", err)
-		return
-	}
+	return
 }

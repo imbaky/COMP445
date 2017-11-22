@@ -7,6 +7,8 @@ import (
 )
 
 const (
+	MinLen int  = 11
+	MaxLen int  = 1024
 	ACK    byte = 0xFF
 	NACK   byte = 0x00
 	SYN    byte = 0xF0
@@ -21,6 +23,9 @@ type packet struct {
 	payld []byte // max 1014 bytes
 }
 
+func (p packet) Sequence() []byte {
+	return p.seq
+}
 func Packet(pType byte, seq, peer, port, payld []byte) (packet, error) {
 	if pType != ACK && pType != NACK && pType != SYN && pType != SYNACK {
 		return packet{}, fmt.Errorf("packet type must be one of the following %v %v %v %v", ACK, NACK, SYN, SYNACK)
@@ -79,4 +84,17 @@ func toBigEnd(x *[]byte) error {
 	}
 	x = &xb
 	return nil
+}
+
+func fromBytes(raw []byte) (packet, error) {
+	if len(raw) < MinLen || len(raw) > MaxLen {
+		return packet{}, fmt.Errorf("packet is too big or too small")
+	}
+	var pkt packet
+	pkt.pType = raw[0]
+	pkt.seq = raw[1:5]
+	pkt.peer = raw[5:9]
+	pkt.port = raw[9:12]
+	pkt.payld = raw[12:]
+	return pkt, nil
 }
