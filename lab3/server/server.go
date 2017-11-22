@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/url"
 	"strings"
@@ -36,13 +37,14 @@ type Response struct {
 }
 
 type Connection struct {
-	Conn       *net.UDPConn
-	Timeout    int
-	Sequence   uint32
-	WindowSize uint32
+	Conn     *net.UDPConn
+	Timeout  int
+	Sequence uint32
+	WindowK  int
+	Buffer   []packet.Packet
 }
 
-func Listen(host, port string, timeout int) (*Connection, error) {
+func Listen(host, port string, timeout, windowK int) (*Connection, error) {
 	addr, err := net.ResolveUDPAddr("udp", port)
 	if err != nil {
 		return nil, err
@@ -51,7 +53,12 @@ func Listen(host, port string, timeout int) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	connection := Connection{conn, timeout, 0, 0}
+	bufSize := 1
+	for i := 1; 0 < windowK; i++ {
+		bufSize *= 2
+	}
+	buffer := make([]packet.Packet, bufSize)
+	connection := Connection{conn, timeout, 0, windowK, buffer}
 	return &connection, nil
 }
 
@@ -66,6 +73,13 @@ func (conn *Connection) Write(pkt packet.Packet) error {
 	_, err := conn.Conn.Write(pkt.Bytes())
 	return err
 }
+func (conn *Connection) generateSequence() {
+	conn.Sequence = uint32(rand.Intn(len(conn.Buffer)))
+}
+
+func getUint32(buff []byte) uint32 {
+	return binary.LittleEndian.Uint32(buff)
+}
 
 func Establish(conn *Connection) bool {
 	c := make(chan packet.Packet, 1)
@@ -73,8 +87,11 @@ func Establish(conn *Connection) bool {
 	if pkt.PType != packet.SYN {
 		return false
 	}
+	clientSize := binary.LittleEndian.Uint32(pkt.Payld)
+	conn.setWindowAndBuffer(int(clientSize))
+	conn.generateSequence()
 	seq := make([]byte, 4)
-	binary.LittleEndian.PutUint32(seq, conn.WindowSize)
+	binary.LittleEndian.PutUint32(seq, conn.Sequence)
 	synack, err := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, []byte{})
 	if err != nil {
 		return false
@@ -89,16 +106,27 @@ func Establish(conn *Connection) bool {
 		}(conn)
 
 		select {
-		case <-time.After(time.Second * time.Duration(conn.Timeout)):
+		case <-time.After(time.Millisecond * time.Duration(conn.Timeout)):
 			conn.Write(synack)
 		case res := <-c:
-			if res.PType == packet.ACK {
+			if res.PType == packet.ACK && getUint32(res.Seq) == (conn.Sequence+1) {
 				return true
 			}
 			conn.Write(synack)
 		}
 	}
 	return false
+}
+
+func (conn *Connection) setWindowAndBuffer(windowK int) {
+	if conn.WindowK > windowK {
+		conn.WindowK = windowK
+	}
+	bufSize := 1
+	for i := 1; 0 < conn.WindowK; i++ {
+		bufSize *= 2
+	}
+	conn.Buffer = make([]packet.Packet, bufSize)
 }
 
 //converts response to string

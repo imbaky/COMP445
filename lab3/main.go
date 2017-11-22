@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 
-	"github.com/imbaky/COMP445/lab3/packet"
+	"github.com/imbaky/COMP445/lab3/server"
 )
 
 func main() {
@@ -43,23 +42,27 @@ func main() {
 	// if err != nil {
 	// 	fmt.Printf("read packets returned %v", err)
 	// }
-	// fmt.Printf("packet %v\n host %v \n port %v \n", pkt, host, port)
-	ServerAddr, err := net.ResolveUDPAddr("udp", ":8007")
-	CheckError(err)
+	// // fmt.Printf("packet %v\n host %v \n port %v \n", pkt, host, port)
+	// ServerAddr, err := net.ResolveUDPAddr("udp", ":8007")
+	// CheckError(err)
 
-	/* Now listen at selected port */
-	ServerConn, err := net.ListenUDP("udp", ServerAddr)
-	CheckError(err)
-	defer ServerConn.Close()
+	// /* Now listen at selected port */
+	// ServerConn, err := net.ListenUDP("udp", ServerAddr)
+	// CheckError(err)
+	// defer ServerConn.Close()
 
-	buf := make([]byte, 1024)
+	// buf := make([]byte, 1024)
 
-	for {
-		n, addr, err := ServerConn.ReadFromUDP(buf)
-		fmt.Println("Received ", string(buf[0:n]), " from ", addr)
-		pkt, err := packet.FromBytes(buf[0:n])
-		CheckError(err)
-		fmt.Printf("packet : %v\n", pkt)
+	// for {
+	// 	n, addr, err := ServerConn.ReadFromUDP(buf)
+	// 	fmt.Println("Received ", string(buf[0:n]), " from ", addr)
+	// 	pkt, err := packet.FromBytes(buf[0:n])
+	// 	CheckError(err)
+	// 	fmt.Printf("packet : %v\n", pkt)
+	// }
+	conn, err := server.Listen("127.0.0.1", "08007", 1200, 7)
+	if err != nil {
+		fmt.Printf("error listening %v\n", err)
 	}
 }
 func CheckError(err error) {
