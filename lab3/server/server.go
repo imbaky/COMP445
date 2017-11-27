@@ -82,17 +82,20 @@ func getUint32(buff []byte) uint32 {
 }
 
 func Establish(conn *Connection) bool {
+	// make the packet channel to read and write to for the handshake
 	c := make(chan packet.Packet, 1)
 	pkt := conn.readPacket()
-	if pkt.PType != packet.SYN {
+	if pkt.PType != packet.SYN { // did not get an establish SYN packet
 		return false
 	}
-	clientSize := binary.LittleEndian.Uint32(pkt.Payld)
+	clientSize := binary.LittleEndian.Uint32(pkt.Payld) // this is the clients windowk
 	conn.setWindowAndBuffer(int(clientSize))
 	conn.generateSequence()
+	windowk := make([]byte, 4)
 	seq := make([]byte, 4)
 	binary.LittleEndian.PutUint32(seq, conn.Sequence)
-	synack, err := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, []byte{})
+	binary.LittleEndian.PutUint32(windowk, uint32(conn.WindowK))
+	synack, err := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, windowk) // Send back the nack with the seq number and the final windowk
 	if err != nil {
 		return false
 	}
@@ -100,7 +103,7 @@ func Establish(conn *Connection) bool {
 	if err != nil {
 		return false
 	}
-	for {
+	for { // keep reading and if not ack send back synack
 		go func(conn *Connection) {
 			c <- conn.readPacket()
 		}(conn)
