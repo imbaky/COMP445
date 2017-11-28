@@ -12,10 +12,18 @@ import (
 	"github.com/imbaky/COMP445/lab3/packet"
 )
 
+const (
+	buffSize = 100000
+)
+
 // File struct definition
 type File struct {
 	FileName string
 	Content  string
+}
+type RequestConnection struct {
+	Request    Request
+	Connection *Connection
 }
 
 // Request struct definition
@@ -40,26 +48,94 @@ type Connection struct {
 	Conn     *net.UDPConn
 	Timeout  int
 	Sequence uint32
-	WindowK  int
-	Buffer   []packet.Packet
+	Buffer   []*packet.Packet
 }
 
-func Listen(host, port string, timeout, windowK int) (*Connection, error) {
+func Listen(host, port string, timeout int, ch chan<- RequestConnection) error {
 	addr, err := net.ResolveUDPAddr("udp", port)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	bufSize := 1
-	for i := 1; 0 < windowK; i++ {
-		bufSize *= 2
+	buffer := make([]*packet.Packet, buffSize)
+	connection := Connection{conn, timeout, 0, buffer}
+
+	for {
+		establish(&connection)
+		ch <- RequestConnection{ParseRequest(receive(&connection)), &connection}
 	}
-	buffer := make([]packet.Packet, bufSize)
-	connection := Connection{conn, timeout, 0, windowK, buffer}
-	return &connection, nil
+}
+
+func checkTimeout(conn *Connection) bool {
+	var peer, port, seq []byte
+	done := true
+	for _, v := range conn.Buffer {
+		if v != nil {
+			peer, port, seq = v.Peer, v.Port, v.Seq
+			break
+		}
+	}
+	for _, v := range conn.Buffer {
+		if v == nil {
+			done = false
+			nack, _ := packet.MakePacket(packet.NACK, seq, peer, port, []byte{})
+			conn.Write(nack)
+		}
+	}
+	return done
+}
+
+func receive(conn *Connection) []byte {
+	total := len(conn.Buffer)
+	go func() {
+		for {
+			time.Sleep(time.Millisecond * time.Duration(conn.Timeout))
+			if checkTimeout(conn) {
+				break
+			}
+		}
+	}()
+
+	for total > 0 {
+		pkt := conn.readPacket()
+		if conn.Buffer[pkt.GetSequence()] != nil {
+			ack, _ := packet.MakePacket(packet.ACK, pkt.Seq, pkt.Peer, pkt.Port, []byte{})
+			conn.Write(ack)
+		} else {
+			copy := pkt
+			conn.Buffer[pkt.GetSequence()] = &copy
+			ack, _ := packet.MakePacket(packet.ACK, pkt.Seq, pkt.Peer, pkt.Port, []byte{})
+			conn.Write(ack)
+		}
+	}
+	return extractPayloads(conn.Buffer)
+}
+
+func extractPayloads(pkts []*packet.Packet) []byte {
+	buf := []byte{}
+	for _, v := range pkts {
+		buf = append(buf, v.Payld...)
+	}
+	return buf
+}
+
+func establish(conn *Connection) {
+	for {
+		pkt := conn.readPacket()
+		if pkt.PType == packet.SYN { // did not get an establish SYN packet
+			conn.Buffer = make([]*packet.Packet, pkt.GetSequence())
+			seq := []byte{0x00, 0x00, 0x00, 0x0F}
+			synack, _ := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, []byte{}) // Send back the nack with the seq number and the final windowk
+			conn.Write(synack)
+			conn.Write(synack)
+			conn.Write(synack)
+			return
+		}
+	}
+	return
 }
 
 func (conn *Connection) readPacket() packet.Packet {
@@ -81,57 +157,6 @@ func getUint32(buff []byte) uint32 {
 	return binary.LittleEndian.Uint32(buff)
 }
 
-func Establish(conn *Connection) bool {
-	// make the packet channel to read and write to for the handshake
-	c := make(chan packet.Packet, 1)
-	pkt := conn.readPacket()
-	if pkt.PType != packet.SYN { // did not get an establish SYN packet
-		return false
-	}
-	clientSize := binary.LittleEndian.Uint32(pkt.Payld) // this is the clients windowk
-	conn.setWindowAndBuffer(int(clientSize))
-	conn.generateSequence()
-	windowk := make([]byte, 4)
-	seq := make([]byte, 4)
-	binary.LittleEndian.PutUint32(seq, conn.Sequence)
-	binary.LittleEndian.PutUint32(windowk, uint32(conn.WindowK))
-	synack, err := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, windowk) // Send back the nack with the seq number and the final windowk
-	if err != nil {
-		return false
-	}
-	err = conn.Write(synack)
-	if err != nil {
-		return false
-	}
-	for { // keep reading and if not ack send back synack
-		go func(conn *Connection) {
-			c <- conn.readPacket()
-		}(conn)
-
-		select {
-		case <-time.After(time.Millisecond * time.Duration(conn.Timeout)):
-			conn.Write(synack)
-		case res := <-c:
-			if res.PType == packet.ACK && getUint32(res.Seq) == (conn.Sequence+1) {
-				return true
-			}
-			conn.Write(synack)
-		}
-	}
-	return false
-}
-
-func (conn *Connection) setWindowAndBuffer(windowK int) {
-	if conn.WindowK > windowK {
-		conn.WindowK = windowK
-	}
-	bufSize := 1
-	for i := 1; 0 < conn.WindowK; i++ {
-		bufSize *= 2
-	}
-	conn.Buffer = make([]packet.Packet, bufSize)
-}
-
 //converts response to string
 func (response Response) ToString() (responseText string) {
 	responseText = fmt.Sprintf("%s %s %s \r\n", response.HTTPVersion, response.Error, response.Status)
@@ -144,10 +169,6 @@ func (response Response) ToString() (responseText string) {
 	}
 	responseText += fmt.Sprintf("%s \r\n\r\n", response.Body)
 	return
-}
-
-func formRequest(conn *net.UDPConn) []byte {
-
 }
 
 //Function to take buffer data and parse it into Request

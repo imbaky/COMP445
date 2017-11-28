@@ -23,6 +23,9 @@ type Packet struct {
 	Payld []byte // max 1014 bytes
 }
 
+func (p *Packet) GetSequence() uint32 {
+	return binary.BigEndian.Uint32(p.Seq)
+}
 func MakePacket(pType byte, seq, peer, port, payld []byte) (Packet, error) {
 	if pType != ACK && pType != NACK && pType != SYN && pType != SYNACK {
 		return Packet{}, fmt.Errorf("packet type must be one of the following %v %v %v %v", ACK, NACK, SYN, SYNACK)
