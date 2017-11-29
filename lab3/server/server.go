@@ -49,6 +49,64 @@ type Connection struct {
 	Timeout  int
 	Sequence uint32
 	Buffer   []*packet.Packet
+	peer     []byte
+	port     []byte
+}
+
+func Respond(response Response, conn *Connection) {
+	respStr := response.ToString()
+	conn.Buffer = []*packet.Packet{}
+	i := 0
+	j := 0
+	for ; i < len([]byte(respStr)); i += 1014 {
+		seq := make([]byte, 4)
+		binary.BigEndian.PutUint32(seq, uint32(j))
+		payload := []byte{}
+		copy([]byte(respStr)[i:i+1014], payload)
+		pkt, _ := packet.MakePacket(packet.ACK, seq, conn.peer, conn.port, payload)
+		conn.Buffer[j] = &pkt
+		j++
+	}
+	seq := make([]byte, 4)
+	binary.BigEndian.PutUint32(seq, uint32(j))
+	payload := []byte{}
+	copy([]byte(respStr)[i:], payload)
+	pkt, _ := packet.MakePacket(packet.ACK, seq, conn.peer, conn.port, payload)
+	conn.Buffer[j] = &pkt
+	establishResponse(conn)
+	SendResponse(conn)
+}
+
+func SendResponse(conn *Connection) {
+	acks := make([]bool, len(conn.Buffer))
+	chacks := make(chan []bool, 1)
+	total := len(conn.Buffer)
+	chacks <- acks
+	for {
+		select {
+		case <-time.After(time.Millisecond * time.Duration(conn.Timeout)):
+			if total == 0 {
+				return
+			}
+			ackArr := <-chacks
+			for k, v := range acks {
+				if !v {
+					conn.Write(*conn.Buffer[k])
+				}
+			}
+			chacks <- ackArr
+		case ackArr := <-chacks:
+			pkt := conn.readPacket()
+			seq := getUint32(pkt.Seq)
+			if !ackArr[int(seq)] {
+				total--
+				ackArr[int(seq)] = true
+			}
+			conn.Write(*(conn.Buffer[int(seq)]))
+			chacks <- ackArr
+		}
+	}
+
 }
 
 func Listen(host, port string, timeout int, ch chan<- RequestConnection) error {
@@ -61,12 +119,20 @@ func Listen(host, port string, timeout int, ch chan<- RequestConnection) error {
 		return err
 	}
 	buffer := make([]*packet.Packet, buffSize)
-	connection := Connection{conn, timeout, 0, buffer}
+	connection := Connection{conn, timeout, 0, buffer, []byte{}, []byte{}}
 
 	for {
 		establish(&connection)
 		ch <- RequestConnection{ParseRequest(receive(&connection)), &connection}
 	}
+}
+
+func establishResponse(conn *Connection) {
+	syn, _ := packet.MakePacket(packet.SYN, []byte{}, conn.peer, conn.port, []byte{}) // Send back the nack with the seq number and the final windowk
+	binary.BigEndian.PutUint32(syn.Seq, uint32(len(conn.Buffer)))
+	conn.Write(syn)
+	conn.Write(syn)
+	conn.Write(syn)
 }
 
 func checkTimeout(conn *Connection) bool {
@@ -127,7 +193,7 @@ func establish(conn *Connection) {
 		pkt := conn.readPacket()
 		if pkt.PType == packet.SYN { // did not get an establish SYN packet
 			conn.Buffer = make([]*packet.Packet, pkt.GetSequence())
-			seq := []byte{0x00, 0x00, 0x00, 0x0F}
+			seq := []byte{0x00, 0x00, 0x00, 0x00}
 			synack, _ := packet.MakePacket(packet.SYNACK, seq, pkt.Peer, pkt.Port, []byte{}) // Send back the nack with the seq number and the final windowk
 			conn.Write(synack)
 			conn.Write(synack)
