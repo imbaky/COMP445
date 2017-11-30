@@ -49,8 +49,8 @@ type Connection struct {
 	Timeout  int
 	Sequence uint32
 	Buffer   []*packet.Packet
-	peer     []byte
-	port     []byte
+	Peer     []byte
+	Port     []byte
 }
 
 func Respond(response Response, conn *Connection) {
@@ -63,7 +63,7 @@ func Respond(response Response, conn *Connection) {
 		binary.BigEndian.PutUint32(seq, uint32(j))
 		payload := []byte{}
 		copy([]byte(respStr)[i:i+1014], payload)
-		pkt, _ := packet.MakePacket(packet.ACK, seq, conn.peer, conn.port, payload)
+		pkt, _ := packet.MakePacket(packet.ACK, seq, conn.Peer, conn.Port, payload)
 		conn.Buffer[j] = &pkt
 		j++
 	}
@@ -71,7 +71,7 @@ func Respond(response Response, conn *Connection) {
 	binary.BigEndian.PutUint32(seq, uint32(j))
 	payload := []byte{}
 	copy([]byte(respStr)[i:], payload)
-	pkt, _ := packet.MakePacket(packet.ACK, seq, conn.peer, conn.port, payload)
+	pkt, _ := packet.MakePacket(packet.ACK, seq, conn.Peer, conn.Port, payload)
 	conn.Buffer[j] = &pkt
 	establishResponse(conn)
 	SendResponse(conn)
@@ -128,7 +128,7 @@ func Listen(host, port string, timeout int, ch chan<- RequestConnection) error {
 }
 
 func establishResponse(conn *Connection) {
-	syn, _ := packet.MakePacket(packet.SYN, []byte{}, conn.peer, conn.port, []byte{}) // Send back the nack with the seq number and the final windowk
+	syn, _ := packet.MakePacket(packet.SYN, []byte{}, conn.Peer, conn.Port, []byte{}) // Send back the nack with the seq number and the final windowk
 	binary.BigEndian.PutUint32(syn.Seq, uint32(len(conn.Buffer)))
 	conn.Write(syn)
 	conn.Write(syn)
